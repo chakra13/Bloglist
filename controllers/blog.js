@@ -1,6 +1,5 @@
 const bloglistRouter = require('express').Router()
 const Blog = require('../models/blog')
-const User = require('../models/user')
 
 bloglistRouter.get('/', async (request, response) => {
   const blogs = await Blog.find({}).populate('user', {
@@ -22,7 +21,7 @@ bloglistRouter.get('/:id', async (request, response) => {
 bloglistRouter.post('/', async (request, response) => {
     const body = request.body
 
-    const user = await User.findById(body.userId)
+    const user = request.user
 
     const blog = new Blog({
         title: body.title,
@@ -39,9 +38,17 @@ bloglistRouter.post('/', async (request, response) => {
 })
 
 bloglistRouter.delete('/:id', async (request, response) => {
-  await Blog.findByIdAndDelete(request.params.id)
-  response.status(204).end()
-          
+  const blog = await Blog.findByIdAndDelete(request.params.id)
+  const user = request.user
+  if(!blog) {
+    return response.status(404).json({ error: 'blog not found' })
+  }
+
+  if (blog.user.toString() !== user._id.toString()) {
+    return response.status(401).json({ error: 'You do not have permission to delete this blog, only the creator can delete this blog' })
+  }
+  await blog.remove()
+  response.status(204).end()      
 })
 
 bloglistRouter.put('/:id', async (request, response) => {
